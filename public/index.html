@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>City Finder - Google Maps Integration</title>
+    
+    <!-- FIX: Add referrer policy meta tag -->
+    <meta name="referrer" content="no-referrer-when-downgrade">
+    
+    <!-- FIX: Add security meta tags -->
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; img-src * data: blob: 'unsafe-inline'; frame-src *; style-src * 'unsafe-inline';">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #10a37f;
+            --primary-dark: #0d8c6c;
+            --primary-light: #e6f3f0;
+            --secondary: #6b7280;
+            --background: #ffffff;
+            --surface: #f9fafb;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --border: #e5e7eb;
+            --error: #ef4444;
+            --error-light: #fee2e2;
+            --success: #10b981;
+            --success-light: #d1fae5;
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .app-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: var(--background);
+            border-radius: 20px;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+            min-height: 90vh;
+        }
+
+        .app-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .app-header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .app-header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .status-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            display: inline-block;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            min-height: 500px;
+        }
+
+        /* Search Panel */
+        .search-panel {
+            background: var(--surface);
+            padding: 30px;
+            border-right: 1px solid var(--border);
+        }
+
+        .search-section {
+            margin-bottom: 30px;
+        }
+
+        .search-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .search-title i {
+            color: var(--primary);
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 15px 20px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-size: 16px;
+            background: var(--background);
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1);
+        }
+
+        .search-input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .search-btn {
+            width: 100%;
+            padding: 15px 20px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .search-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .search-btn:disabled {
+            background: var(--secondary);
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .quick-cities {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .city-chip {
+            padding: 12px 16px;
+            background: var(--background);
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .city-chip:hover {
+            border-color: var(--primary);
+            background: var(--primary-light);
+            transform: translateY(-2px);
+        }
+
+        .city-chip.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Results Panel */
+        .results-panel {
+            padding: 30px;
+            background: var(--background);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .results-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .copy-btn {
+            padding: 8px 16px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: var(--primary-dark);
+        }
+
+        .map-container {
+            flex: 1;
+            background: var(--surface);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            margin-bottom: 20px;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .static-map {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .map-placeholder {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 40px;
+        }
+
+        .map-placeholder i {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+
+        .results-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .place-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .place-card:hover {
+            box-shadow: var(--shadow);
+            transform: translateY(-2px);
+        }
+
+        .place-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .place-name {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+        }
+
+        .place-rating {
+            background: var(--success);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .place-address {
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .place-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: var(--background);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .action-btn:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        /* Loading and Error States */
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top: 2px solid currentColor;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: var(--error-light);
+            color: var(--error);
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid var(--error);
+            margin-bottom: 20px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Debug Info */
+        .debug-info {
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .debug-toggle {
+            background: #6b7280;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 10px 0;
+            font-size: 12px;
+        }
+
+        .debug-toggle:hover {
+            background: #4b5563;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .search-panel {
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+            
+            .quick-cities {
+                grid-template-columns: 1fr;
+            }
+            
+            .app-header h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <h1>🏙️ City Finder</h1>
+            <p>Discover cities and places around the world with Google Maps integration</p>
+            <div class="status-badge">CORS: COMPLETELY OPEN ✅ | Port: 3000 | Referrer Policy: Fixed</div>
+        </header>
+
+        <button class="debug-toggle" onclick="toggleDebug()">Toggle Debug Info</button>
+        
+        <div id="debugInfo" class="debug-info hidden">
+            <h4>Debug Information:</h4>
+            <div id="debugContent"></div>
+        </div>
+
+        <div class="main-content">
+            <!-- Search Panel -->
+            <div class="search-panel">
+                <div class="search-section">
+                    <h2 class="search-title">
+                        <i>🔍</i> Search Cities & Places
+                    </h2>
+                    
+                    <div class="input-group">
+                        <input type="text" 
+                               class="search-input" 
+                               id="searchInput"
+                               placeholder="Enter city name or place (e.g., 'Paris restaurants', 'Tokyo hotels')"
+                               aria-label="Search cities and places">
+                    </div>
+
+                    <button class="search-btn" id="searchBtn" onclick="searchPlaces()">
+                        <span id="btnText">Search Cities</span>
+                        <span class="loading-spinner hidden" id="loadingSpinner"></span>
+                    </button>
+
+                    <div class="quick-cities">
+                        <div class="city-chip" onclick="searchCity('New York')">New York 🗽</div>
+                        <div class="city-chip" onclick="searchCity('Paris')">Paris 🗼</div>
+                        <div class="city-chip" onclick="searchCity('Tokyo')">Tokyo 🗾</div>
+                        <div class="city-chip" onclick="searchCity('London')">London 🎡</div>
+                        <div class="city-chip" onclick="searchCity('Dubai')">Dubai 🏙️</div>
+                        <div class="city-chip" onclick="searchCity('Sydney')">Sydney 🏖️</div>
+                        <div class="city-chip" onclick="searchCity('Rome')">Rome 🏛️</div>
+                        <div class="city-chip" onclick="searchCity('Bangkok')">Bangkok 🏮</div>
+                    </div>
+                </div>
+
+                <div class="search-section">
+                    <h2 class="search-title">
+                        <i>🎯</i> Search Options
+                    </h2>
+                    
+                    <div class="input-group">
+                        <select class="search-input" id="searchType">
+                            <option value="">All Categories</option>
+                            <option value="restaurant">🍽️ Restaurants</option>
+                            <option value="hotel">🏨 Hotels</option>
+                            <option value="cafe">☕ Coffee Shops</option>
+                            <option value="park">🌳 Parks</option>
+                            <option value="museum">🏛️ Museums</option>
+                            <option value="shopping_mall">🛍️ Shopping</option>
+                            <option value="tourist_attraction">🏰 Attractions</option>
+                        </select>
+                    </div>
+
+                    <div class="input-group">
+                        <select class="search-input" id="searchRadius">
+                            <option value="5000">Within 5km</option>
+                            <option value="10000">Within 10km</option>
+                            <option value="20000">Within 20km</option>
+                            <option value="50000">Within 50km</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="results-panel">
+                <div class="results-header">
+                    <h2 class="results-title" id="resultsTitle">Search Results</h2>
+                    <button class="copy-btn" id="copyBtn" onclick="copyResults()" style="display: none;">
+                        📋 Copy Results
+                    </button>
+                </div>
+
+                <!-- Error Display -->
+                <div class="error-message hidden" id="errorContainer"></div>
+
+                <!-- Map Container -->
+                <div class="map-container" id="mapContainer">
+                    <div class="map-placeholder">
+                        <i>🗺️</i>
+                        <p>Enter a city name to see the map and search results</p>
+                    </div>
+                </div>
+
+                <!-- Results List -->
+                <div class="results-list" id="resultsList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE_URL = 'http://192.168.56.10:3000/api/maps';
+        const API_KEY = 'openwebui-maps-integration-2024';
+
+        // DOM Elements
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const searchType = document.getElementById('searchType');
+        const searchRadius = document.getElementById('searchRadius');
+        const resultsList = document.getElementById('resultsList');
+        const mapContainer = document.getElementById('mapContainer');
+        const errorContainer = document.getElementById('errorContainer');
+        const copyBtn = document.getElementById('copyBtn');
+        const resultsTitle = document.getElementById('resultsTitle');
+        const btnText = document.getElementById('btnText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const debugContent = document.getElementById('debugContent');
+
+        let lastSearchResults = null;
+
+        // Debug logging
+        function debugLog(message, data = null) {
+            console.log('🔧 ' + message, data || '');
+            if (debugContent) {
+                const timestamp = new Date().toLocaleTimeString();
+                debugContent.innerHTML += `<div style="margin-bottom: 5px; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px;">
+                    <strong>[${timestamp}]</strong> ${message} 
+                    ${data ? '<br><small>' + JSON.stringify(data) + '</small>' : ''}
+                </div>`;
+                debugContent.scrollTop = debugContent.scrollHeight;
+            }
+        }
+
+        function toggleDebug() {
+            const debugInfo = document.getElementById('debugInfo');
+            debugInfo.classList.toggle('hidden');
+        }
+
+        // Event Listeners
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchPlaces();
+            }
+        });
+
+        // Main search function with referrer policy fix
+        async function searchPlaces() {
+            const query = searchInput.value.trim();
+            if (!query) {
+                showError('Please enter a search query');
+                return;
+            }
+
+            setLoadingState(true);
+            hideError();
+            debugLog('Starting search', { query });
+
+            try {
+                const searchParams = {
+                    query: query,
+                    location: await getCityCoordinates(query),
+                    radius: parseInt(searchRadius.value),
+                    type: searchType.value || null
+                };
+
+                debugLog('Sending API request', searchParams);
+
+                // FIX: Use fetch with referrer policy
+                const response = await fetch(`${API_BASE_URL}/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-api-key': API_KEY
+                    },
+                    body: JSON.stringify(searchParams),
+                    // FIX: Add referrer policy to fetch request
+                    referrerPolicy: 'no-referrer-when-downgrade'
+                });
+
+                debugLog('API response received', { status: response.status, headers: Object.fromEntries(response.headers) });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                debugLog('API response data', data);
+
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    throw new Error(data.error || data.message || 'Search failed');
+                }
+
+            } catch (error) {
+                console.error('Search error:', error);
+                debugLog('Search failed', { error: error.message });
+                showError(`Search failed: ${error.message}`);
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        // Quick city search
+        function searchCity(cityName) {
+            searchInput.value = cityName;
+            searchPlaces();
+        }
+
+        // Get coordinates for a city
+        async function getCityCoordinates(query) {
+            debugLog('Getting coordinates for', query);
+            
+            const commonLocations = {
+                'new york': '40.7128,-74.0060',
+                'los angeles': '34.0522,-118.2437',
+                'chicago': '41.8781,-87.6298',
+                'miami': '25.7617,-80.1918',
+                'london': '51.5074,-0.1278',
+                'tokyo': '35.6762,139.6503',
+                'paris': '48.8566,2.3522',
+                'sydney': '-33.8688,151.2093',
+                'bangkok': '13.7563,100.5018',
+                'dubai': '25.2048,55.2708',
+                'rome': '41.9028,12.4964',
+                'san francisco': '37.7749,-122.4194',
+                'seattle': '47.6062,-122.3321',
+                'toronto': '43.6532,-79.3832',
+                'berlin': '52.5200,13.4050',
+                'amsterdam': '52.3676,4.9041',
+                'singapore': '1.3521,103.8198',
+                'hong kong': '22.3193,114.1694',
+                'shanghai': '31.2304,121.4737'
+            };
+
+            const cityName = query.toLowerCase();
+            
+            if (commonLocations[cityName]) {
+                debugLog('Found coordinates in cache', { city: cityName, coordinates: commonLocations[cityName] });
+                return commonLocations[cityName];
+            }
+
+            // Fallback: use geocoding API
+            try {
+                debugLog('Trying geocoding API for', cityName);
+                const response = await fetch(`${API_BASE_URL}/geocode?location=${encodeURIComponent(cityName)}`, {
+                    headers: { 'x-api-key': API_KEY },
+                    referrerPolicy: 'no-referrer-when-downgrade'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    debugLog('Geocoding successful', data);
+                    return data.coordinates;
+                } else {
+                    throw new Error(data.error || 'Geocoding failed');
+                }
+            } catch (error) {
+                debugLog('Geocoding failed, using New York as fallback', { error: error.message });
+                return commonLocations['new york']; // Default fallback
+            }
+        }
+
+        // Display search results
+        function displayResults(data) {
+            debugLog('Displaying results', { resultCount: data.places?.length || 0 });
+            
+            resultsTitle.textContent = `Results for "${data.query}"`;
+            copyBtn.style.display = 'block';
+            
+            // Store results for copying
+            lastSearchResults = data;
+
+            // Clear previous results
+            resultsList.innerHTML = '';
+
+            if (!data.places || data.places.length === 0) {
+                resultsList.innerHTML = `
+                    <div class="place-card">
+                        <p style="text-align: center; color: var(--text-secondary);">
+                            No places found. Try a different search term.
+                        </p>
+                    </div>
+                `;
+                mapContainer.innerHTML = `
+                    <div class="map-placeholder">
+                        <i>❌</i>
+                        <p>No results found for this search</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Display static map
+            if (data.static_map_url) {
+                mapContainer.innerHTML = `
+                    <img src="${data.static_map_url}" alt="Map of ${data.query}" class="static-map" 
+                         onerror="this.style.display='none'" 
+                         crossorigin="anonymous">
+                `;
+                debugLog('Static map loaded', { url: data.static_map_url });
+            }
+
+            // Display places
+            data.places.forEach((place, index) => {
+                const placeCard = createPlaceCard(place, index);
+                resultsList.appendChild(placeCard);
+            });
+
+            debugLog('Results displayed successfully');
+        }
+
+        // Create place card element
+        function createPlaceCard(place, index) {
+            const rating = place.rating ? place.rating.toFixed(1) : 'N/A';
+            const isOpen = place.opening_hours ? place.opening_hours.open_now : null;
+            const mapsUrl = `https://www.google.com/maps/place/?q=place_id:${place.place_id}`;
+            const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(place.formatted_address)}`;
+
+            const card = document.createElement('div');
+            card.className = 'place-card';
+            card.innerHTML = `
+                <div class="place-header">
+                    <h3 class="place-name">${index + 1}. ${place.name}</h3>
+                    <span class="place-rating">⭐ ${rating}</span>
+                </div>
+                <p class="place-address">📍 ${place.formatted_address}</p>
+                ${isOpen !== null ? `
+                    <p style="margin-bottom: 15px;">
+                        <strong>Status:</strong> 
+                        <span style="color: ${isOpen ? 'var(--success)' : 'var(--error)'};">
+                            ${isOpen ? '🟢 Open Now' : '🔴 Closed Now'}
+                        </span>
+                    </p>
+                ` : ''}
+                <div class="place-actions">
+                    <a href="${mapsUrl}" target="_blank" class="action-btn" rel="noopener noreferrer">
+                        🗺️ View Map
+                    </a>
+                    <a href="${directionsUrl}" target="_blank" class="action-btn" rel="noopener noreferrer">
+                        🚗 Directions
+                    </a>
+                    ${place.website ? `
+                        <a href="${place.website}" target="_blank" class="action-btn" rel="noopener noreferrer">
+                            🌐 Website
+                        </a>
+                    ` : ''}
+                    ${place.formatted_phone_number ? `
+                        <a href="tel:${place.formatted_phone_number}" class="action-btn">
+                            📞 Call
+                        </a>
+                    ` : ''}
+                </div>
+            `;
+
+            return card;
+        }
+
+        // Copy results to clipboard
+        async function copyResults() {
+            if (!lastSearchResults) return;
+
+            const text = lastSearchResults.llm_response;
+            debugLog('Copying results to clipboard');
+            
+            try {
+                await navigator.clipboard.writeText(text);
+                
+                // Show success feedback
+                const originalText = copyBtn.textContent;
+                copyBtn.textContent = '✅ Copied!';
+                copyBtn.style.background = 'var(--success)';
+                debugLog('Results copied to clipboard successfully');
+                
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.style.background = 'var(--primary)';
+                }, 2000);
+            } catch (err) {
+                console.error('Copy failed:', err);
+                debugLog('Copy failed', { error: err.message });
+                showError('Failed to copy results to clipboard');
+            }
+        }
+
+        // Utility functions
+        function setLoadingState(loading) {
+            if (loading) {
+                btnText.classList.add('hidden');
+                loadingSpinner.classList.remove('hidden');
+                searchBtn.disabled = true;
+                debugLog('Loading state: ON');
+            } else {
+                btnText.classList.remove('hidden');
+                loadingSpinner.classList.add('hidden');
+                searchBtn.disabled = false;
+                debugLog('Loading state: OFF');
+            }
+        }
+
+        function showError(message) {
+            errorContainer.innerHTML = `
+                <strong>Error:</strong> ${message}
+                <br><small>Check the debug console for more details</small>
+            `;
+            errorContainer.classList.remove('hidden');
+            debugLog('Error displayed', { message });
+        }
+
+        function hideError() {
+            errorContainer.classList.add('hidden');
+        }
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            debugLog('Page initialized');
+            debugLog('API Base URL', API_BASE_URL);
+            debugLog('Referrer Policy', document.referrerPolicy || 'not set');
+            
+            // Focus search input
+            searchInput.focus();
+            
+            // Test CORS on load
+            testCORS();
+        });
+
+        // Test CORS functionality
+        async function testCORS() {
+            try {
+                debugLog('Testing CORS configuration...');
+                const response = await fetch('http://192.168.56.10:3000/api/cors-test', {
+                    referrerPolicy: 'no-referrer-when-downgrade'
+                });
+                const data = await response.json();
+                debugLog('CORS test successful', data);
+            } catch (error) {
+                debugLog('CORS test failed', { error: error.message });
+                console.error('CORS test failed:', error);
+            }
+        }
+    </script>
+</body>
+</html>
